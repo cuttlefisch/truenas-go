@@ -24,21 +24,6 @@ type goMethod struct {
 	APIMethod     string // e.g. "zfs.snapshot.create"
 }
 
-// serviceMethodInfo combines API and Go information for one service method.
-type serviceMethodInfo struct {
-	APIMethod   string
-	GoMethod    string
-	Implemented bool
-	TestCount   int
-}
-
-// serviceGroup holds all methods for one Go service, keyed by namespace.
-type serviceGroup struct {
-	ServiceStruct string
-	Namespaces    []string
-	Methods       []serviceMethodInfo
-}
-
 func main() {
 	dir := flag.String("dir", ".", "project root directory")
 	output := flag.String("o", "", "output file path (default: stdout)")

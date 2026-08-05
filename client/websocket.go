@@ -645,6 +645,9 @@ func (c *WebSocketClient) connect(ctx context.Context) (*websocket.Conn, error) 
 		c.wsPath = "/api/current"
 	}
 
+	// nolint:bodyclose // gorilla/websocket returns the handshake *http.Response
+	// only so a caller can inspect a FAILED handshake (redirects, auth). We
+	// discard it and only proceed when err is nil, so there is no body to close.
 	conn, _, err := c.dialer.DialContext(ctx, c.endpoint(), http.Header{})
 	if err != nil {
 		return nil, fmt.Errorf("websocket connect failed: %w", err)

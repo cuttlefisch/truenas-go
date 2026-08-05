@@ -7,26 +7,6 @@ import (
 	"testing"
 )
 
-// sampleCronJobJSON returns a JSON array response for a cron job query.
-func sampleCronJobJSON() json.RawMessage {
-	return json.RawMessage(`[{
-		"id": 1,
-		"user": "root",
-		"command": "/usr/local/bin/backup.sh",
-		"description": "Daily backup",
-		"enabled": true,
-		"stdout": false,
-		"stderr": true,
-		"schedule": {
-			"minute": "0",
-			"hour": "3",
-			"dom": "*",
-			"month": "*",
-			"dow": "*"
-		}
-	}]`)
-}
-
 // sampleCronJobSingleJSON returns a single JSON object response for get_instance.
 func sampleCronJobSingleJSON() json.RawMessage {
 	return json.RawMessage(`{

@@ -139,8 +139,8 @@ func TestVerifyHostKey_Mismatch(t *testing.T) {
 	}
 
 	// Verify error contains both expected and actual fingerprints
-	trueNASErr, ok := err.(*TrueNASError)
-	if !ok {
+	var trueNASErr *TrueNASError
+	if !errors.As(err, &trueNASErr) {
 		t.Fatalf("expected TrueNASError, got %T", err)
 	}
 	if trueNASErr.Code != "EHOSTKEY" {
@@ -388,8 +388,8 @@ func TestSSHClient_Connect_DialError(t *testing.T) {
 	}
 
 	// Check that it's a TrueNASError with ECONNREFUSED
-	trueNASErr, ok := err.(*TrueNASError)
-	if !ok {
+	var trueNASErr *TrueNASError
+	if !errors.As(err, &trueNASErr) {
 		t.Fatalf("expected TrueNASError, got %T", err)
 	}
 	if trueNASErr.Code != "ECONNREFUSED" {
