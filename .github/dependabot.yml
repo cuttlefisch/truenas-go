@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(deps):"
+    groups:
+      # Grouped into one PR per week rather than one PR per module. Ungrouped,
+      # the noise means the PRs stop getting read — which is how this repo
+      # reached 25 reachable vulnerabilities, 5 of them from a single stale
+      # golang.org/x/crypto.
+      go-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci(deps):"
+    groups:
+      ci-dependencies:
+        patterns: ["*"]
+
+# NOTE — Dependabot does NOT bump the Go toolchain itself. It updates module
+# requirements, not the `toolchain` directive in go.mod, so a standard-library
+# CVE will never arrive here as a PR. That gap is covered by the govulncheck
+# job in .github/workflows/lint.yml, which scans with the exact toolchain CI
+# builds with and fails on reachable vulnerabilities. If it fails on a
+# `Standard library` finding, bump `toolchain` in go.mod and `go` in mise.toml
+# together — that is precisely how the 12 stdlib vulns on 2026-08-05 surfaced.
