@@ -1,0 +1,78 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The pinned tool versions live in three files that must agree: go.mod's
+  # `toolchain`, mise.toml's [tools], and this workflow's own pins. Three
+  # disagreeing definitions of "what we build with" is exactly how a stale
+  # toolchain hid 12 reachable standard-library vulnerabilities until the
+  # govulncheck gate landed. This job makes the drift fail fast and cheaply.
+  versions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Calls the mise task rather than restating the check inline. mise file
+      # tasks are plain executable scripts, so CI can invoke one directly
+      # without installing mise — one definition, two callers.
+      - name: Pinned versions agree
+        run: .mise/tasks/check-versions
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+
+      # golangci-lint embeds staticcheck but does NOT read staticcheck.conf,
+      # so the standalone binary is run too — it is the only thing that proves
+      # the two configs still agree. They diverged by 12 findings before
+      # staticcheck.conf existed.
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@2026.1
+          staticcheck ./...
+
+  govulncheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          govulncheck ./...

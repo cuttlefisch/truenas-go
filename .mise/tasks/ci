@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+#MISE description="Run the full CI gate locally, mirroring .github/workflows/"
+set -euo pipefail
+
+# PARITY CLAIM: this target mirrors .github/workflows/{test,lint,coverage,features}.yml.
+# Treat a change to any of those workflows as incomplete until this task is
+# updated to match, and vice versa. An aggregate target that has silently
+# drifted from the real pipeline is worse than none, because it gives false
+# local confidence before a push.
+#
+#   test.yml     -> go test -race
+#   lint.yml     -> check-versions, golangci-lint, staticcheck, govulncheck
+#   coverage.yml -> coverage with the action's own flags, vs its threshold
+#   features.yml -> FEATURES.md regenerates with no diff
+#
+# WHY GOTOOLCHAIN IS FORCED BELOW — this is the whole point of the task.
+# go.mod's `toolchain` directive is a MINIMUM, not a pin: a developer on a
+# newer Go keeps using it, while CI installs the directive's exact version via
+# actions/setup-go. That gap is not theoretical — in the sibling provider repo
+# a local govulncheck on Go 1.26.5 reported 0 vulnerabilities while CI, on the
+# then-pinned 1.25.5, found 12 reachable standard-library CVEs. Forcing the
+# exact version makes a local run mean what CI means.
+
+cd "$(dirname "$0")/../.."
+
+TOOLCHAIN=$(sed -n 's/^toolchain go\(.*\)$/\1/p' go.mod)
+if [ -z "$TOOLCHAIN" ]; then
+    echo "no toolchain directive in go.mod — refusing to guess a Go version" >&2
+    exit 1
+fi
+export GOTOOLCHAIN="go${TOOLCHAIN}"
+
+GOLANGCI_VERSION=$(sed -n 's/^golangci-lint = "\(.*\)"$/\1/p' mise.toml)
+STATICCHECK_VERSION=$(sed -n 's/^staticcheck = "\(.*\)"$/\1/p' mise.toml)
+GOVULNCHECK_VERSION=v1.6.0   # keep in sync with .github/workflows/lint.yml
+
+# Must match coverage.yml's `coverage-threshold`. Note the action runs with
+# -covermode=count -coverpkg=./..., a DIFFERENT denominator than a plain
+# `go test -coverprofile` — reproduce its flags exactly or the number is not
+# comparable to the gate.
+COVERAGE_THRESHOLD=86.0
+
+step() { echo ""; echo "==> $1"; }
+
+step "Go toolchain (forced to CI's pin)"
+go version
+
+step "check-versions"
+.mise/tasks/check-versions
+
+step "build"
+go build ./...
+
+step "vet"
+go vet ./...
+
+step "golangci-lint ${GOLANGCI_VERSION}"
+go run "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${GOLANGCI_VERSION}" \
+    run ./... --max-issues-per-linter=0 --max-same-issues=0
+
+step "staticcheck ${STATICCHECK_VERSION}"
+go run "honnef.co/go/tools/cmd/staticcheck@${STATICCHECK_VERSION}" ./...
+
+step "FEATURES.md is up to date"
+go run ./cmd/featurematrix -o FEATURES.md
+if ! git diff --exit-code FEATURES.md; then
+    echo "FEATURES.md is out of date — commit the regenerated file" >&2
+    exit 1
+fi
+
+step "test -race"
+go test -race ./...
+
+step "coverage (coverage.yml flags, threshold ${COVERAGE_THRESHOLD})"
+covfile=$(mktemp -t cover.XXXXXX.out)
+trap 'rm -f "$covfile"' EXIT
+go test -covermode=count -coverpkg=./... ./... -coverprofile="$covfile" >/dev/null
+total=$(go tool cover -func="$covfile" | tail -1 | awk '{print $NF}' | tr -d '%')
+echo "total coverage: ${total}% (threshold ${COVERAGE_THRESHOLD}%)"
+awk -v t="$total" -v m="$COVERAGE_THRESHOLD" \
+    'BEGIN { if (t+0 < m+0) { print "coverage below threshold"; exit 1 } }'
+
+step "govulncheck ${GOVULNCHECK_VERSION}"
+go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" ./...
+
+echo ""
+echo "CI gate passed."

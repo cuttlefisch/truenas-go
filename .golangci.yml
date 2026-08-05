@@ -1,0 +1,72 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  # standard = errcheck, govet, ineffassign, staticcheck, unused
+  default: standard
+  enable:
+    - bodyclose
+    - copyloopvar
+    - errorlint
+    - misspell
+    - nilerr
+    - usetesting
+    - whitespace
+
+  # Deliberately NOT enabled:
+  #   unparam      - flags unused ctx/resp params that are required by the
+  #                  terraform-plugin-framework interfaces and idiomatic Go.
+  #   govet:shadow - the test suite shadows helpers like strPtr inside table
+  #                  cases on purpose; 16 findings, none of them defects.
+  #   unconvert    - flags the 27 `_ = resource.Resource(r)` compile-time
+  #                  interface assertions in tests. Those conversions are the
+  #                  point, not an accident.
+  settings:
+    errcheck:
+      # Left off: the only two hits are in internal/types, asserting the
+      # result of the same type's own ValueFromString, which is a concrete
+      # method that can only return that type. Guarding them adds branches no
+      # test can reach, which costs coverage to protect against nothing.
+      check-type-assertions: false
+    staticcheck:
+      # Full ruleset, including the ST* stylecheck class that the standalone
+      # staticcheck binary applies, minus two classes that are wrong for a
+      # library. Keeps `mise run lint` and `staticcheck ./...` from disagreeing.
+      # MUST stay byte-for-byte equivalent to the `checks` list in
+      # staticcheck.conf — golangci-lint embeds staticcheck but does not read
+      # that file, so any divergence means the two tools disagree about what a
+      # finding is. See staticcheck.conf for why each entry is here.
+      checks:
+        - all
+        - "-ST1000"
+        - "-ST1003"
+        - "-ST1016"
+        - "-ST1020"
+        - "-ST1021"
+        - "-ST1022"
+        - "-ST1023"
+        - "-S1016"
+
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Test files legitimately shadow err and skip Close() error checks on
+      # in-memory fixtures.
+      - path: _test\.go
+        linters:
+          - bodyclose
+          - errcheck
+
+# goimports runs without local-prefixes on purpose: regrouping imports
+# repo-wide would conflict with upstream on every rebase.
+formatters:
+  enable:
+    - gofmt
+    - goimports

@@ -30,6 +30,11 @@ jobs:
       - name: Coverage
         uses: gwatts/go-coverage-action@v2
         with:
-          coverage-threshold: 0
+          # Measured 86.4% with this action's own invocation
+          # (-covermode=count -coverpkg=./...), which reads slightly higher
+          # than the 86.3% a plain `go test -coverprofile` gives — different
+          # denominator, not a different suite. Threshold sits just under the
+          # measured value so a real regression fails but rounding does not.
+          coverage-threshold: 86.0
           cover-pkg: ./...
-          fail-coverage: never
+          fail-coverage: always
