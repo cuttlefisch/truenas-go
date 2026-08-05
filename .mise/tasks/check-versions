@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+#MISE description="Verify pinned tool versions agree across go.mod, mise.toml and CI"
+set -euo pipefail
+
+# The versions we build with are declared in three files that must agree:
+#
+#   go.mod                     `toolchain` — what actions/setup-go resolves
+#   mise.toml                  [tools]     — what a local `mise` shell gets
+#   .github/workflows/lint.yml pins        — what the lint/vuln jobs install
+#
+# Three independent declarations of "what we build with" is an unenforced
+# invariant, and unenforced invariants decay. This makes the drift fail fast.
+#
+# Concretely: go.mod said 1.25.5 while local development ran 1.26.5, so a
+# local govulncheck reported 0 vulnerabilities while CI — correctly building
+# with 1.25.5 — found 12 reachable standard-library CVEs. This check exists so
+# that class of disagreement is caught by a script instead of by a red main.
+
+cd "$(dirname "$0")/../.."
+
+WORKFLOW=.github/workflows/lint.yml
+fail=0
+
+check() {
+    local what="$1" a="$2" b="$3" a_src="$4" b_src="$5"
+    if [ -z "$a" ] || [ -z "$b" ]; then
+        echo "  MISSING  $what: could not parse ($a_src='$a', $b_src='$b')"
+        fail=1
+    elif [ "$a" != "$b" ]; then
+        echo "  MISMATCH $what: $a_src='$a' vs $b_src='$b'"
+        fail=1
+    else
+        echo "  ok       $what = $a"
+    fi
+}
+
+mod_go=$(sed -n 's/^toolchain go\(.*\)$/\1/p' go.mod)
+mise_go=$(sed -n 's/^go = "\(.*\)"$/\1/p' mise.toml)
+check "go toolchain" "$mod_go" "$mise_go" "go.mod" "mise.toml"
+
+yml_gcl=$(sed -n 's/^ *version: v\(2\.[0-9.]*\) *$/\1/p' "$WORKFLOW" | head -1)
+mise_gcl=$(sed -n 's/^golangci-lint = "\(.*\)"$/\1/p' mise.toml)
+check "golangci-lint" "$yml_gcl" "$mise_gcl" "$WORKFLOW" "mise.toml"
+
+yml_sc=$(sed -n 's/.*staticcheck@\([0-9.]*\).*/\1/p' "$WORKFLOW" | head -1)
+mise_sc=$(sed -n 's/^staticcheck = "\(.*\)"$/\1/p' mise.toml)
+check "staticcheck" "$yml_sc" "$mise_sc" "$WORKFLOW" "mise.toml"
+
+if [ "$fail" -ne 0 ]; then
+    echo ""
+    echo "Pinned versions disagree. Bump them together, then re-run." >&2
+    exit 1
+fi
+
+echo "All pinned versions agree."

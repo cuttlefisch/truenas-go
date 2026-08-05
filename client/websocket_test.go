@@ -860,7 +860,9 @@ func TestWebSocketClient_PongTimeout(t *testing.T) {
 
 	// Next call should fail or reconnect
 	// The connection was closed due to pong timeout
-	_, err = client.Call(ctx, "test.method", nil)
+	// Result deliberately discarded: either outcome is valid (see below), so
+	// binding err here only to never read it was an ineffectual assignment.
+	_, _ = client.Call(ctx, "test.method", nil)
 	// Either error or reconnect is acceptable - the test verifies timeout detection works
 	// If it reconnects, the call succeeds; if not, we get an error
 	// Both outcomes are valid as long as timeout was detected

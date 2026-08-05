@@ -387,7 +387,11 @@ func (c *SSHClient) callAndWaitWithPolling(ctx context.Context, method string, p
 	// Parse the job ID from the result
 	var jobID int64
 	if err := json.Unmarshal(result, &jobID); err != nil {
-		// If it's not a job ID, the method completed synchronously
+		// If it's not a job ID, the method completed synchronously.
+		// nolint:nilerr // the unmarshal failure IS the success signal here:
+		// a non-job-ID result means there is nothing to poll, so the result is
+		// returned as-is. Propagating err would turn every synchronous call
+		// into a failure.
 		return result, nil
 	}
 

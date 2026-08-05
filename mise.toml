@@ -1,0 +1,10 @@
+[tools]
+# Pinned rather than "latest" so a local run and CI agree on what a finding is.
+#
+# go must match the `toolchain` directive in go.mod — that is the version CI
+# resolves via actions/setup-go's go-version-file. Bump the two together.
+# golangci-lint and staticcheck must match the versions pinned in
+# .github/workflows/lint.yml. `mise run check-versions` enforces all of this.
+go = "1.25.12"
+golangci-lint = "2.12.2"
+staticcheck = "2026.1"
