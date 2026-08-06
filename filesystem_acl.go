@@ -255,3 +255,8 @@ func sameBoolMap(a, b map[string]bool) bool {
 	}
 	return true
 }
+
+// entryCount returns the number of ACEs, whichever flavour is populated.
+func (a *ACL) entryCount() int {
+	return len(a.NFS4) + len(a.POSIX)
+}

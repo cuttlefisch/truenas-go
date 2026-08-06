@@ -2,6 +2,7 @@ package truenas
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -85,5 +86,25 @@ func TestMockFilesystemService_ACLCallsFunc(t *testing.T) {
 	}
 	if gotSet.Path != "/mnt/y" || !gotSet.StripACL {
 		t.Errorf("SetACL passthrough failed: %+v", gotSet)
+	}
+}
+
+func TestMockFilesystemService_PreflightSetPerm(t *testing.T) {
+	m := &MockFilesystemService{}
+	if err := m.PreflightSetPerm(context.Background(), SetPermOpts{Path: "/mnt/x"}); err != nil {
+		t.Errorf("PreflightSetPerm = %v; want nil by default", err)
+	}
+
+	var got SetPermOpts
+	m.PreflightSetPermFunc = func(_ context.Context, opts SetPermOpts) error {
+		got = opts
+		return ErrExtendedACLPresent
+	}
+	err := m.PreflightSetPerm(context.Background(), SetPermOpts{Path: "/mnt/y", Mode: "755"})
+	if !errors.Is(err, ErrExtendedACLPresent) {
+		t.Errorf("PreflightSetPerm = %v", err)
+	}
+	if got.Path != "/mnt/y" || got.Mode != "755" {
+		t.Errorf("passthrough failed: %+v", got)
 	}
 }

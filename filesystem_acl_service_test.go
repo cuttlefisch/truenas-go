@@ -558,3 +558,150 @@ func jsonEqual(a, b any) bool {
 	y, _ := json.Marshal(b)
 	return string(x) == string(y)
 }
+
+// --- PreflightSetPerm --------------------------------------------------------
+
+// aclFixture returns a getacl payload for the given acltype and trivial flag.
+func aclFixture(acltype string, trivial bool, entries string) json.RawMessage {
+	return json.RawMessage(`{
+		"path": "/mnt/tank/share", "acltype": "` + acltype + `",
+		"trivial": ` + boolLit(trivial) + `, "acl": ` + entries + `
+	}`)
+}
+
+func boolLit(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
+const nfs4NamedUserACE = `[{"tag":"USER","type":"ALLOW","id":3001,"who":"alice",
+	"perms":{"BASIC":"MODIFY"},"flags":{"BASIC":"INHERIT"}}]`
+
+// The case P8 exists to prevent: a mode change against a path carrying a
+// named-user ACE must be refused before anything is written.
+func TestFilesystemService_PreflightSetPerm_RefusesNonTrivialACL(t *testing.T) {
+	s := aclService(func(method string, _ any) (json.RawMessage, error) {
+		if method != "filesystem.getacl" {
+			t.Errorf("preflight called %q; it must only read", method)
+		}
+		return aclFixture(ACLTypeNFS4, false, nfs4NamedUserACE), nil
+	})
+
+	err := s.PreflightSetPerm(context.Background(), SetPermOpts{
+		Path: "/mnt/tank/share", Mode: "755",
+	})
+	if err == nil {
+		t.Fatal("expected a refusal for a non-trivial ACL")
+	}
+	if !errors.Is(err, ErrExtendedACLPresent) {
+		t.Errorf("error does not wrap ErrExtendedACLPresent: %v", err)
+	}
+	// The message has to be actionable: which path, which flavour, and the
+	// way out.
+	for _, want := range []string{"/mnt/tank/share", "NFS4", "stripacl"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error should mention %q, got %v", want, err)
+		}
+	}
+}
+
+// A trivial ACL expresses nothing a mode cannot, so setperm would succeed and
+// the preflight must not block it.
+func TestFilesystemService_PreflightSetPerm_AllowsTrivialACL(t *testing.T) {
+	s := aclService(func(string, any) (json.RawMessage, error) {
+		return aclFixture(ACLTypeNFS4, true, `[]`), nil
+	})
+
+	if err := s.PreflightSetPerm(context.Background(), SetPermOpts{
+		Path: "/mnt/tank/share", Mode: "755",
+	}); err != nil {
+		t.Errorf("trivial ACL should pass preflight, got %v", err)
+	}
+}
+
+func TestFilesystemService_PreflightSetPerm_AllowsDisabledACL(t *testing.T) {
+	s := aclService(func(string, any) (json.RawMessage, error) {
+		return aclFixture(ACLTypeDisabled, false, `[]`), nil
+	})
+
+	if err := s.PreflightSetPerm(context.Background(), SetPermOpts{
+		Path: "/mnt/tank/plain", Mode: "755",
+	}); err != nil {
+		t.Errorf("DISABLED ACL should pass preflight, got %v", err)
+	}
+}
+
+// StripACL is the caller saying the discard is intended, which is exactly what
+// the server's own guard accepts. Preflighting anyway would cost a call and
+// refuse something that would in fact succeed.
+func TestFilesystemService_PreflightSetPerm_StripACLSkipsTheCheck(t *testing.T) {
+	called := false
+	s := aclService(func(string, any) (json.RawMessage, error) {
+		called = true
+		return aclFixture(ACLTypeNFS4, false, nfs4NamedUserACE), nil
+	})
+
+	if err := s.PreflightSetPerm(context.Background(), SetPermOpts{
+		Path: "/mnt/tank/share", Mode: "755", StripACL: true,
+	}); err != nil {
+		t.Errorf("stripacl should pass preflight, got %v", err)
+	}
+	if called {
+		t.Error("preflight read the ACL despite stripacl making the answer moot")
+	}
+}
+
+// A missing path is setperm's error to report. Turning it into a preflight
+// failure would replace a clear message with a confusing one.
+func TestFilesystemService_PreflightSetPerm_MissingPathIsNotAFailure(t *testing.T) {
+	s := aclService(func(string, any) (json.RawMessage, error) {
+		return nil, errors.New("[ENOENT] path does not exist")
+	})
+
+	if err := s.PreflightSetPerm(context.Background(), SetPermOpts{
+		Path: "/mnt/gone", Mode: "755",
+	}); err != nil {
+		t.Errorf("a missing path should not fail preflight, got %v", err)
+	}
+}
+
+// A transport failure must not read as "safe to proceed".
+func TestFilesystemService_PreflightSetPerm_TransportErrorSurfaces(t *testing.T) {
+	s := aclService(func(string, any) (json.RawMessage, error) {
+		return nil, errors.New("connection refused")
+	})
+
+	err := s.PreflightSetPerm(context.Background(), SetPermOpts{
+		Path: "/mnt/tank/share", Mode: "755",
+	})
+	if err == nil {
+		t.Fatal("a transport error must surface rather than pass preflight")
+	}
+	if errors.Is(err, ErrExtendedACLPresent) {
+		t.Error("a transport error was reported as an ACL problem")
+	}
+}
+
+// POSIX ACLs get the same treatment; the flavour must be named accurately so
+// the operator knows what they are looking at.
+func TestFilesystemService_PreflightSetPerm_POSIXNonTrivial(t *testing.T) {
+	s := aclService(func(string, any) (json.RawMessage, error) {
+		return aclFixture(ACLTypePOSIX1E, false,
+			`[{"tag":"USER","default":false,"id":3001,"perms":{"READ":true,"WRITE":true,"EXECUTE":false}}]`), nil
+	})
+
+	err := s.PreflightSetPerm(context.Background(), SetPermOpts{
+		Path: "/mnt/tank/share", Mode: "755",
+	})
+	if err == nil {
+		t.Fatal("expected a refusal for a non-trivial POSIX ACL")
+	}
+	if !strings.Contains(err.Error(), "POSIX1E") {
+		t.Errorf("error should name the POSIX1E flavour, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "1 entry") {
+		t.Errorf("error should count the entries at risk, got %v", err)
+	}
+}
