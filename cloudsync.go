@@ -132,7 +132,7 @@ func parseCredentialV24(raw credentialRaw) (CloudSyncCredentialResponse, error) 
 // Pre-25.x uses separate "provider" (string) and "attributes" (object).
 // 25.x+ uses "provider" as object with "type" merged with attributes.
 func BuildCredentialsParams(v Version, name, providerType string, attributes map[string]any) map[string]any {
-	if v.AtLeast(25, 0) {
+	if v.SupportsCloudSyncProviderObject() {
 		// 25.x format: provider is object with type + attributes
 		providerObj := map[string]any{"type": providerType}
 		for k, val := range attributes {
@@ -163,7 +163,7 @@ func ParseCredentials(data []byte, v Version) ([]CloudSyncCredentialResponse, er
 	}
 
 	parse := parseCredentialV25
-	if !v.AtLeast(25, 0) {
+	if !v.SupportsCloudSyncProviderObject() {
 		parse = parseCredentialV24
 	}
 

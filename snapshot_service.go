@@ -21,7 +21,7 @@ const (
 // Pre-25.10 uses "zfs.snapshot.*", 25.10+ uses "pool.snapshot.*".
 func resolveSnapshotMethod(v Version, method string) string {
 	prefix := "zfs.snapshot"
-	if v.AtLeast(25, 10) {
+	if v.UsesPoolSnapshotNamespace() {
 		prefix = "pool.snapshot"
 	}
 	return prefix + "." + method
