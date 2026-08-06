@@ -639,7 +639,7 @@ func (c *WebSocketClient) connect(ctx context.Context) (*websocket.Conn, error) 
 		// TrueNAS 24.x uses /websocket with a legacy DDP-like protocol (not supported)
 		// When version is zero (undetected), we're in the bootstrap phase during
 		// Connect. Default to /api/current and let detectVersion handle the check.
-		if !version.IsZero() && !version.AtLeast(25, 0) {
+		if !version.IsZero() && !version.SupportsJSONRPCAPI() {
 			return nil, fmt.Errorf("%w (detected version: %s)", ErrUnsupportedVersion, version.Raw)
 		}
 		c.wsPath = "/api/current"
@@ -1027,7 +1027,7 @@ func (c *WebSocketClient) detectVersion(ctx context.Context) (truenas.Version, e
 		return truenas.Version{}, err
 	}
 
-	if !version.AtLeast(25, 0) {
+	if !version.SupportsJSONRPCAPI() {
 		return truenas.Version{}, fmt.Errorf("%w (detected version: %s)", ErrUnsupportedVersion, version.Raw)
 	}
 

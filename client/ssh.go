@@ -306,7 +306,7 @@ func (c *SSHClient) CallAndWait(ctx context.Context, method string, params any) 
 
 	// TrueNAS 25.x+ supports core.subscribe, so midclt -j works
 	// TrueNAS 24.x doesn't have core.subscribe, so we poll core.get_jobs
-	if version.AtLeast(25, 0) {
+	if version.SupportsCoreSubscribe() {
 		return c.callAndWaitWithFlag(ctx, method, params)
 	}
 	return c.callAndWaitWithPolling(ctx, method, params)
