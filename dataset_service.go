@@ -20,6 +20,18 @@ type Dataset struct {
 	Recordsize  string
 	Used        int64
 	Available   int64
+
+	// ACLType, ACLMode and CaseSensitivity shape a dataset for SMB. All three
+	// are returned by pool.dataset.query, so they round-trip.
+	//
+	// There is deliberately no ShareType field: share_type is accepted by
+	// pool.dataset.create but is NOT among the 52 properties
+	// pool.dataset.query returns, in either 25.04 or 25.10. It is a
+	// create-time macro that sets the other three, not a stored property, so
+	// there is nothing to read back and a caller must not expect one.
+	ACLType         string
+	ACLMode         string
+	CaseSensitivity string
 }
 
 // CreateDatasetOpts contains options for creating a filesystem dataset.
@@ -31,6 +43,28 @@ type CreateDatasetOpts struct {
 	RefQuota    int64
 	Atime       string
 	Recordsize  string
+
+	// ACLType is OFF, NFSV4, POSIX or INHERIT. SMB requires NFSV4.
+	ACLType string
+	// ACLMode is PASSTHROUGH, RESTRICTED, DISCARD or INHERIT.
+	ACLMode string
+
+	// CaseSensitivity is SENSITIVE, INSENSITIVE or INHERIT.
+	//
+	// IMMUTABLE: pool.dataset.update does not accept it, so changing it means
+	// destroying and recreating the dataset. Windows clients expect
+	// INSENSITIVE, which is why an SMB share on a SENSITIVE dataset behaves
+	// subtly wrongly rather than failing outright.
+	CaseSensitivity string
+
+	// ShareType is GENERIC, MULTIPROTOCOL, NFS, SMB or APPS, defaulting to
+	// GENERIC. It is a create-time macro that presets the other three fields
+	// for a workload.
+	//
+	// IMMUTABLE, and also WRITE-ONLY: pool.dataset.update rejects it and
+	// pool.dataset.query never returns it. Nothing can read back what was
+	// requested, so a caller that needs to know must remember it.
+	ShareType string
 }
 
 // UpdateDatasetOpts contains options for updating a filesystem dataset.
@@ -43,6 +77,12 @@ type UpdateDatasetOpts struct {
 	Atime       string // Empty = don't change
 	Recordsize  string // Empty = don't change
 	Comments    *string
+
+	// ACLType and ACLMode are the only two of the four SMB-shaping fields that
+	// pool.dataset.update accepts. casesensitivity and share_type are
+	// create-only; they are absent here on purpose, not by omission.
+	ACLType string // Empty = don't change
+	ACLMode string // Empty = don't change
 }
 
 // Zvol is the user-facing representation of a TrueNAS zvol.
@@ -284,6 +324,10 @@ func datasetFromResponse(resp DatasetResponse) Dataset {
 		Recordsize:  resp.Recordsize.Value,
 		Used:        resp.Used.Parsed,
 		Available:   resp.Available.Parsed,
+
+		ACLType:         resp.ACLType.Value,
+		ACLMode:         resp.ACLMode.Value,
+		CaseSensitivity: resp.CaseSens.Value,
 	}
 }
 
@@ -338,6 +382,18 @@ func datasetCreateParams(opts CreateDatasetOpts) map[string]any {
 	if opts.Recordsize != "" {
 		params["recordsize"] = opts.Recordsize
 	}
+	if opts.ACLType != "" {
+		params["acltype"] = opts.ACLType
+	}
+	if opts.ACLMode != "" {
+		params["aclmode"] = opts.ACLMode
+	}
+	if opts.CaseSensitivity != "" {
+		params["casesensitivity"] = opts.CaseSensitivity
+	}
+	if opts.ShareType != "" {
+		params["share_type"] = opts.ShareType
+	}
 	return params
 }
 
@@ -361,6 +417,12 @@ func datasetUpdateParams(opts UpdateDatasetOpts) map[string]any {
 	}
 	if opts.Comments != nil {
 		params["comments"] = *opts.Comments
+	}
+	if opts.ACLType != "" {
+		params["acltype"] = opts.ACLType
+	}
+	if opts.ACLMode != "" {
+		params["aclmode"] = opts.ACLMode
 	}
 	return params
 }

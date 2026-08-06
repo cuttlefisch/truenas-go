@@ -157,6 +157,25 @@ func Methods(version string) (map[string]MethodDef, error) {
 	return methods, nil
 }
 
+// RawMethods returns each method's complete schema entry, undecoded.
+//
+// Methods decodes into MethodDef, which carries only the call metadata (job,
+// filterable, and so on) and discards the parameter and result schemas. Those
+// schemas are what say which fields a method accepts and returns — the facts
+// that decide whether an attribute is mutable, or readable at all — so a
+// caller asserting against them needs the raw entry.
+func RawMethods(version string) (map[string]json.RawMessage, error) {
+	data, err := methodsFS.ReadFile(version + "/methods.json")
+	if err != nil {
+		return nil, fmt.Errorf("no methods for version %s: %w", version, err)
+	}
+	var methods map[string]json.RawMessage
+	if err := json.Unmarshal(data, &methods); err != nil {
+		return nil, fmt.Errorf("parsing methods for %s: %w", version, err)
+	}
+	return methods, nil
+}
+
 // LatestVersion returns the highest embedded version string.
 func LatestVersion() string {
 	vs := Versions()
