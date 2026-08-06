@@ -1,8 +1,8 @@
 # TrueNAS API Feature Matrix
 
-TrueNAS version: 25.04
+TrueNAS version: 25.10
 
-Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemented)
+Total API methods: 768 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemented)
 
 ## Covered Namespaces
 
@@ -11,16 +11,16 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | AppService | app, app.image, app.registry | 38 | 15 (39%) | 15 (100%) |
 | CloudSyncService | cloudsync, cloudsync.credentials | 20 | 9 (45%) | 9 (100%) |
 | CronService | cronjob | 6 | 6 (100%) | 6 (100%) |
-| DatasetService | pool, pool.dataset | 50 | 5 (10%) | 5 (100%) |
-| DockerService | docker | 8 | 2 (25%) | 2 (100%) |
-| FilesystemService | filesystem | 13 | 2 (15%) | 2 (100%) |
+| DatasetService | pool, pool.dataset | 51 | 5 (10%) | 5 (100%) |
+| DockerService | docker | 9 | 2 (22%) | 2 (100%) |
+| FilesystemService | filesystem | 12 | 2 (17%) | 2 (100%) |
 | InterfaceService | interface | 23 | 1 (4%) | 1 (100%) |
 | NetworkService | network.general | 1 | 1 (100%) | 1 (100%) |
 | ReportingService | reporting | 8 | 2 (25%) | 2 (100%) |
-| SnapshotService | zfs.snapshot | 9 | 7 (78%) | 7 (100%) |
+| SnapshotService | pool.snapshot | 10 | 7 (70%) | 7 (100%) |
 | SystemService | system | 14 | 2 (14%) | 2 (100%) |
-| VMService | vm, vm.device | 51 | 10 (20%) | 10 (100%) |
-| VirtService | virt.global, virt.instance | 18 | 12 (67%) | 12 (100%) |
+| VMService | vm, vm.device | 53 | 10 (19%) | 10 (100%) |
+| VirtService | virt.global, virt.instance | 19 | 12 (63%) | 12 (100%) |
 
 ### AppService — `app` (28 methods)
 
@@ -29,7 +29,6 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | app.available |  |  |  |  |
 | app.available_space | ✓ | AvailableSpace | ✓ | 2 |
 | app.categories |  |  |  |  |
-| app.certificate_authority_choices |  |  |  |  |
 | app.certificate_choices |  |  |  |  |
 | app.config |  |  |  |  |
 | app.container_console_choices |  |  |  |  |
@@ -53,6 +52,7 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | app.update | ✓ | UpdateApp | ✓ | 5 |
 | app.upgrade | ✓ | UpgradeApp | ✓ | 2 |
 | app.upgrade_summary | ✓ | UpgradeSummary | ✓ | 2 |
+| app.used_host_ips |  |  |  |  |
 | app.used_ports |  |  |  |  |
 
 ### AppService — `app.image` (5 methods)
@@ -145,7 +145,7 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | pool.upgrade |  |  |  |  |
 | pool.validate_name |  |  |  |  |
 
-### DatasetService — `pool.dataset` (26 methods)
+### DatasetService — `pool.dataset` (27 methods)
 
 | API Method | Implemented | Go Method | Tested | Tests |
 |------------|:-----------:|-----------|:------:|------:|
@@ -171,16 +171,18 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | pool.dataset.query | ✓ | GetDataset, ListDatasets, GetZvol | ✓ | 13 |
 | pool.dataset.recommended_zvol_blocksize |  |  |  |  |
 | pool.dataset.recordsize_choices |  |  |  |  |
+| pool.dataset.rename |  |  |  |  |
 | pool.dataset.set_quota |  |  |  |  |
 | pool.dataset.snapshot_count |  |  |  |  |
 | pool.dataset.unlock |  |  |  |  |
 | pool.dataset.update | ✓ | UpdateDataset, UpdateZvol | ✓ | 7 |
 
-### DockerService — `docker` (8 methods)
+### DockerService — `docker` (9 methods)
 
 | API Method | Implemented | Go Method | Tested | Tests |
 |------------|:-----------:|-----------|:------:|------:|
 | docker.backup |  |  |  |  |
+| docker.backup_to_pool |  |  |  |  |
 | docker.config | ✓ | GetConfig | ✓ | 3 |
 | docker.delete_backup |  |  |  |  |
 | docker.list_backups |  |  |  |  |
@@ -189,11 +191,10 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | docker.status | ✓ | GetStatus | ✓ | 3 |
 | docker.update |  |  |  |  |
 
-### FilesystemService — `filesystem` (13 methods)
+### FilesystemService — `filesystem` (12 methods)
 
 | API Method | Implemented | Go Method | Tested | Tests |
 |------------|:-----------:|-----------|:------:|------:|
-| filesystem.can_access_as_user |  |  |  |  |
 | filesystem.chown |  |  |  |  |
 | filesystem.get |  |  |  |  |
 | filesystem.get_zfs_attributes |  |  |  |  |
@@ -218,16 +219,16 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | interface.choices |  |  |  |  |
 | interface.commit |  |  |  |  |
 | interface.create |  |  |  |  |
-| interface.default_route_will_be_removed |  |  |  |  |
 | interface.delete |  |  |  |  |
 | interface.get_instance |  |  |  |  |
 | interface.has_pending_changes |  |  |  |  |
 | interface.ip_in_use |  |  |  |  |
 | interface.lacpdu_rate_choices |  |  |  |  |
 | interface.lag_ports_choices |  |  |  |  |
+| interface.network_config_to_be_removed |  |  |  |  |
 | interface.query | ✓ | List, Get | ✓ | 8 |
 | interface.rollback |  |  |  |  |
-| interface.save_default_route |  |  |  |  |
+| interface.save_network_config |  |  |  |  |
 | interface.services_restarted_on_sync |  |  |  |  |
 | interface.update |  |  |  |  |
 | interface.vlan_parent_interface_choices |  |  |  |  |
@@ -254,19 +255,20 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | reporting.netdata_graphs | ✓ | ListGraphs | ✓ | 4 |
 | reporting.update |  |  |  |  |
 
-### SnapshotService — `zfs.snapshot` (9 methods)
+### SnapshotService — `pool.snapshot` (10 methods)
 
 | API Method | Implemented | Go Method | Tested | Tests |
 |------------|:-----------:|-----------|:------:|------:|
-| zfs.snapshot.clone | ✓ | Clone | ✓ | 3 |
-| zfs.snapshot.create | ✓ | Create | ✓ | 6 |
-| zfs.snapshot.delete | ✓ | Delete | ✓ | 2 |
-| zfs.snapshot.get_instance |  |  |  |  |
-| zfs.snapshot.hold | ✓ | Hold | ✓ | 2 |
-| zfs.snapshot.query | ✓ | Get, List, Query | ✓ | 15 |
-| zfs.snapshot.release | ✓ | Release | ✓ | 2 |
-| zfs.snapshot.rollback | ✓ | Rollback | ✓ | 3 |
-| zfs.snapshot.update |  |  |  |  |
+| pool.snapshot.clone | ✓ | Clone | ✓ | 3 |
+| pool.snapshot.create | ✓ | Create | ✓ | 6 |
+| pool.snapshot.delete | ✓ | Delete | ✓ | 2 |
+| pool.snapshot.get_instance |  |  |  |  |
+| pool.snapshot.hold | ✓ | Hold | ✓ | 2 |
+| pool.snapshot.query | ✓ | Get, List, Query | ✓ | 15 |
+| pool.snapshot.release | ✓ | Release | ✓ | 2 |
+| pool.snapshot.rename |  |  |  |  |
+| pool.snapshot.rollback | ✓ | Rollback | ✓ | 3 |
+| pool.snapshot.update |  |  |  |  |
 
 ### SystemService — `system` (14 methods)
 
@@ -327,11 +329,12 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | vm.update | ✓ | UpdateVM | ✓ | 3 |
 | vm.virtualization_details |  |  |  |  |
 
-### VMService — `vm.device` (16 methods)
+### VMService — `vm.device` (18 methods)
 
 | API Method | Implemented | Go Method | Tested | Tests |
 |------------|:-----------:|-----------|:------:|------:|
 | vm.device.bind_choices |  |  |  |  |
+| vm.device.convert |  |  |  |  |
 | vm.device.create | ✓ | CreateDevice | ✓ | 10 |
 | vm.device.delete | ✓ | DeleteDevice | ✓ | 2 |
 | vm.device.disk_choices |  |  |  |  |
@@ -347,6 +350,7 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | vm.device.usb_controller_choices |  |  |  |  |
 | vm.device.usb_passthrough_choices |  |  |  |  |
 | vm.device.usb_passthrough_device |  |  |  |  |
+| vm.device.virtual_size |  |  |  |  |
 
 ### VirtService — `virt.global` (5 methods)
 
@@ -358,7 +362,7 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | virt.global.pool_choices |  |  |  |  |
 | virt.global.update | ✓ | UpdateGlobalConfig | ✓ | 3 |
 
-### VirtService — `virt.instance` (13 methods)
+### VirtService — `virt.instance` (14 methods)
 
 | API Method | Implemented | Go Method | Tested | Tests |
 |------------|:-----------:|-----------|:------:|------:|
@@ -372,16 +376,16 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | virt.instance.image_choices |  |  |  |  |
 | virt.instance.query | ✓ | ListInstances | ✓ | 5 |
 | virt.instance.restart |  |  |  |  |
+| virt.instance.set_bootable_disk |  |  |  |  |
 | virt.instance.start | ✓ | StartInstance | ✓ | 2 |
 | virt.instance.stop | ✓ | StopInstance | ✓ | 3 |
 | virt.instance.update | ✓ | UpdateInstance | ✓ | 3 |
 
-## Uncovered Namespaces (95 namespaces, 512 methods)
+## Uncovered Namespaces (95 namespaces, 504 methods)
 
 | Namespace | Methods |
 |-----------|--------:|
 | acme.dns.authenticator | 6 |
-| activedirectory | 5 |
 | alert | 5 |
 | alertclasses | 2 |
 | alertservice | 6 |
@@ -394,32 +398,29 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | boot.environment | 5 |
 | catalog | 6 |
 | certificate | 9 |
-| certificateauthority | 6 |
 | cloud_backup | 12 |
 | config | 3 |
-| core | 14 |
+| core | 16 |
 | device | 1 |
-| directoryservices | 3 |
-| disk | 13 |
+| directoryservices | 6 |
+| disk | 9 |
 | dns | 1 |
 | docker.network | 2 |
 | enclosure.label | 1 |
-| failover | 16 |
 | failover.disabled | 1 |
 | failover.reboot | 2 |
+| fc.fc_host | 5 |
+| fcport | 7 |
 | filesystem.acltemplate | 6 |
 | ftp | 2 |
 | group | 8 |
-| hardware.memory | 1 |
-| idmap | 8 |
+| hardware.virtualization | 1 |
+| idmap | 1 |
 | initshutdownscript | 5 |
-| interface.capabilities | 2 |
 | ipmi | 1 |
 | ipmi.chassis | 2 |
-| ipmi.lan | 4 |
-| ipmi.mc | 1 |
+| ipmi.lan | 3 |
 | ipmi.sel | 3 |
-| ipmi.sensors | 1 |
 | iscsi.auth | 5 |
 | iscsi.extent | 6 |
 | iscsi.global | 6 |
@@ -428,16 +429,21 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | iscsi.target | 6 |
 | iscsi.targetextent | 5 |
 | jbof | 7 |
-| k8s_to_docker | 2 |
 | kerberos | 2 |
 | kerberos.keytab | 5 |
 | kerberos.realm | 5 |
 | keychaincredential | 10 |
 | kmip | 5 |
-| ldap | 4 |
 | mail | 4 |
 | network.configuration | 3 |
 | nfs | 6 |
+| nvmet.global | 3 |
+| nvmet.host | 8 |
+| nvmet.host_subsys | 5 |
+| nvmet.namespace | 5 |
+| nvmet.port | 6 |
+| nvmet.port_subsys | 5 |
+| nvmet.subsys | 5 |
 | pool.resilver | 2 |
 | pool.scrub | 7 |
 | pool.snapshottask | 10 |
@@ -447,18 +453,16 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | reporting.exporters | 6 |
 | route | 2 |
 | rsynctask | 6 |
-| service | 9 |
+| service | 10 |
 | sharing.nfs | 5 |
-| sharing.smb | 8 |
-| smart | 2 |
-| smart.test | 10 |
-| smb | 6 |
+| sharing.smb | 9 |
+| smb | 4 |
 | snmp | 2 |
 | ssh | 3 |
 | staticroute | 5 |
 | support | 9 |
 | system.advanced | 10 |
-| system.general | 14 |
+| system.general | 13 |
 | system.global | 1 |
 | system.ntpserver | 5 |
 | system.reboot | 1 |
@@ -469,16 +473,17 @@ Total API methods: 771 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | truecommand | 2 |
 | truenas | 8 |
 | tunable | 6 |
-| update | 10 |
+| update | 9 |
 | ups | 4 |
 | user | 13 |
 | virt.device | 7 |
 | virt.volume | 7 |
 | vmware | 8 |
+| zfs.resource | 1 |
 
 ## Go Methods Not in API Schema (13 methods)
 
-These Go methods call API endpoints not present in the 25.04 method schema
+These Go methods call API endpoints not present in the 25.10 method schema
 (e.g., subscription/event channels, version-specific aliases).
 
 | Go Service | Go Method | API Method |
@@ -487,13 +492,13 @@ These Go methods call API endpoints not present in the 25.04 method schema
 | AppService | SubscribeStats | app.stats |
 | FilesystemService | WriteFile | filesystem.file_receive |
 | ReportingService | SubscribeRealtime | reporting.realtime |
-| SnapshotService | Clone | pool.snapshot.clone |
-| SnapshotService | Create | pool.snapshot.create |
-| SnapshotService | Delete | pool.snapshot.delete |
-| SnapshotService | Hold | pool.snapshot.hold |
-| SnapshotService | List | pool.snapshot.query |
-| SnapshotService | Query | pool.snapshot.query |
-| SnapshotService | Get | pool.snapshot.query |
-| SnapshotService | Release | pool.snapshot.release |
-| SnapshotService | Rollback | pool.snapshot.rollback |
+| SnapshotService | Clone | zfs.snapshot.clone |
+| SnapshotService | Create | zfs.snapshot.create |
+| SnapshotService | Delete | zfs.snapshot.delete |
+| SnapshotService | Hold | zfs.snapshot.hold |
+| SnapshotService | List | zfs.snapshot.query |
+| SnapshotService | Query | zfs.snapshot.query |
+| SnapshotService | Get | zfs.snapshot.query |
+| SnapshotService | Release | zfs.snapshot.release |
+| SnapshotService | Rollback | zfs.snapshot.rollback |
 
