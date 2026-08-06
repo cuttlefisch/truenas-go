@@ -2,7 +2,7 @@
 
 TrueNAS version: 25.10
 
-Total API methods: 768 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemented)
+Total API methods: 768 | Implemented: 79 (10.3%) | Tested: 75 (94.9% of implemented)
 
 ## Covered Namespaces
 
@@ -17,6 +17,7 @@ Total API methods: 768 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | InterfaceService | interface | 23 | 1 (4%) | 1 (100%) |
 | NetworkService | network.general | 1 | 1 (100%) | 1 (100%) |
 | ReportingService | reporting | 8 | 2 (25%) | 2 (100%) |
+| SharingNFSService | sharing.nfs | 5 | 5 (100%) | 1 (20%) |
 | SnapshotService | pool.snapshot | 10 | 7 (70%) | 7 (100%) |
 | SystemService | system | 14 | 2 (14%) | 2 (100%) |
 | VMService | vm, vm.device | 53 | 10 (19%) | 10 (100%) |
@@ -255,6 +256,16 @@ Total API methods: 768 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | reporting.netdata_graphs | ✓ | ListGraphs | ✓ | 4 |
 | reporting.update |  |  |  |  |
 
+### SharingNFSService — `sharing.nfs` (5 methods)
+
+| API Method | Implemented | Go Method | Tested | Tests |
+|------------|:-----------:|-----------|:------:|------:|
+| sharing.nfs.create | ✓ | Create | ✓ | 1 |
+| sharing.nfs.delete | ✓ | Delete |  |  |
+| sharing.nfs.get_instance | ✓ | Get |  |  |
+| sharing.nfs.query | ✓ | List |  |  |
+| sharing.nfs.update | ✓ | Update |  |  |
+
 ### SnapshotService — `pool.snapshot` (10 methods)
 
 | API Method | Implemented | Go Method | Tested | Tests |
@@ -381,7 +392,7 @@ Total API methods: 768 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | virt.instance.stop | ✓ | StopInstance | ✓ | 3 |
 | virt.instance.update | ✓ | UpdateInstance | ✓ | 3 |
 
-## Uncovered Namespaces (95 namespaces, 504 methods)
+## Uncovered Namespaces (94 namespaces, 499 methods)
 
 | Namespace | Methods |
 |-----------|--------:|
@@ -454,7 +465,6 @@ Total API methods: 768 | Implemented: 74 (9.6%) | Tested: 74 (100.0% of implemen
 | route | 2 |
 | rsynctask | 6 |
 | service | 10 |
-| sharing.nfs | 5 |
 | sharing.smb | 9 |
 | smb | 4 |
 | snmp | 2 |
