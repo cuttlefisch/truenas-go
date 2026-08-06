@@ -23,6 +23,16 @@ go test ./... -run TestSnapshotService -v  # single test
 go vet ./...
 ```
 
+## Releasing
+
+See `RELEASING.md`. This library is **always released before** the provider,
+which consumes it via a `go.mod` replace. `mise run release` computes the
+version from conventional commits, shows the plan, and requires confirmation.
+
+Do not rename the module: it deliberately keeps upstream's
+`github.com/deevus/truenas-go` path so both repos stay mergeable back to
+upstream, and Go resolves the provider's `replace` to this repo regardless.
+
 ## Architecture
 
 ### Three-layer design
