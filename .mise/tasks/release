@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+#MISE description="Cut a release: compute the version, show the plan, confirm, tag"
+#USAGE arg "[version]" help="Override the computed version (e.g. 0.7.0). Omit to compute it."
+set -euo pipefail
+
+# Check -> Plan -> Confirm -> Apply, the same shape every mutating script in
+# this estate uses. A release is one-way in the ways that matter: a pushed tag
+# is public, a published version number cannot be reused, and Go module proxies
+# cache a version permanently. So the version is COMPUTED but never applied
+# without a human agreeing to it.
+#
+# Computed from conventional commits by git-cliff. That is a suggestion, not an
+# authority: a commit-type inference can be wrong -- a `build(deps):` that
+# swaps the whole client library reads as a patch -- and the confirmation step
+# is where a human overrules it. Pass an explicit version to do so.
+#
+# Release ORDER matters across the two repos. See RELEASING.md: this library is
+# tagged FIRST, then the provider's go.mod replace is bumped to the new tag,
+# then the provider is tagged.
+
+cd "$(dirname "$0")/../.."
+
+REQUESTED="${usage_version:-}"
+
+die() { echo "" >&2; echo "❌ $1" >&2; exit 1; }
+step() { echo ""; echo "==> $1"; }
+
+# ---------------------------------------------------------------- CHECK -----
+step "Check"
+
+command -v git-cliff >/dev/null 2>&1 || die "git-cliff is not installed (mise.toml pins it)"
+
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+[ "$BRANCH" = "main" ] || die "on branch '$BRANCH'; releases are cut from main"
+
+if ! git diff --quiet || ! git diff --cached --quiet; then
+    die "working tree is dirty; commit or stash first"
+fi
+
+git fetch --quiet origin main
+LOCAL="$(git rev-parse HEAD)"
+REMOTE="$(git rev-parse '@{u}' 2>/dev/null || echo "")"
+[ -n "$REMOTE" ] || die "no upstream for main"
+if [ "$LOCAL" != "$REMOTE" ]; then
+    die "main differs from origin/main; pull or push first"
+fi
+
+LAST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo "(none)")"
+
+# Nothing unreleased is a no-op, not a failure -- and it exits WITHOUT
+# prompting. A confirmation prompt for a change that would not happen trains
+# people to type yes without reading.
+UNRELEASED="$(git-cliff --unreleased --strip all 2>/dev/null | tr -d '[:space:]')"
+if [ -z "$UNRELEASED" ]; then
+    echo "  nothing unreleased since ${LAST_TAG}; nothing to do"
+    exit 0
+fi
+
+if [ -n "$REQUESTED" ]; then
+    [[ "$REQUESTED" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "version must be X.Y.Z, got '$REQUESTED'"
+    VERSION="v${REQUESTED}"
+    SOURCE="supplied on the command line"
+else
+    VERSION="$(git-cliff --bumped-version 2>/dev/null | tail -1)"
+    [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "git-cliff computed an unusable version: '$VERSION'"
+    SOURCE="computed by git-cliff from conventional commits"
+fi
+
+git rev-parse "$VERSION" >/dev/null 2>&1 && die "tag $VERSION already exists"
+
+echo "  branch:     $BRANCH (in sync with origin)"
+echo "  last tag:   $LAST_TAG"
+echo "  new tag:    $VERSION  [$SOURCE]"
+
+step "Check: full CI gate"
+./.mise/tasks/ci >/dev/null 2>&1 || die "mise run ci fails; fix that before releasing"
+echo "  ci passed"
+
+# ----------------------------------------------------------------- PLAN -----
+step "Plan"
+cat <<PLAN
+  1. prepend the unreleased section to CHANGELOG.md
+  2. commit it as "chore(release): prepare $VERSION"
+  3. create a SIGNED annotated tag $VERSION
+  4. print the push command -- this script does NOT push
+
+  Release notes for $VERSION:
+
+PLAN
+git-cliff --unreleased --tag "$VERSION" 2>/dev/null | sed 's/^/    /'
+
+# -------------------------------------------------------------- CONFIRM -----
+step "Confirm"
+echo "  This creates a commit and a tag on main. Pushing them is public and"
+echo "  permanent: a Go module version, once fetched, is cached by the module"
+echo "  proxy forever and cannot be changed or withdrawn."
+echo ""
+printf "  Type 'yes' to proceed: "
+read -r REPLY
+[ "$REPLY" = "yes" ] || die "aborted; nothing was changed"
+
+# ---------------------------------------------------------------- APPLY -----
+step "Apply"
+
+# --prepend, NOT a whole-history regeneration. Regenerating rewrites entries
+# that were published in earlier releases, so any config change silently
+# alters what users already read. Prepending touches only the new section.
+git-cliff --unreleased --tag "$VERSION" --prepend CHANGELOG.md 2>/dev/null
+git add CHANGELOG.md
+git commit --quiet -m "chore(release): prepare $VERSION"
+
+# Signed, matching the machine's `tag.gpgsign = true`. Note most historical
+# tags in this repo are LIGHTWEIGHT -- consistency starts here rather than by
+# rewriting published tags, which would break anyone who pinned one.
+git tag -s "$VERSION" -m "$VERSION"
+
+echo "  committed and tagged $VERSION"
+echo ""
+echo "  Push it:"
+echo "    git push origin main && git push origin $VERSION"
+echo ""
+echo "  Undo it:"
+echo "    git tag -d $VERSION && git reset --hard HEAD~1"
