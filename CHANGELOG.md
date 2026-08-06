@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.7.0] - 2026-08-06
+
+
+### Added
+
+- **api:** Report the method delta between embedded schemas
+- **client:** Add a stateful in-memory fake middleware
+- Add SharingNFSService for the sharing.nfs namespace
+
+### Build & CI
+
+- Add release tooling — cliff config, changelog, release task
+
+### Documentation
+
+- Document the release order
+
+### Miscellaneous
+
+- Regenerate FEATURES.md for SharingNFSService
+
+### Testing
+
+- **fake:** Cover the accessors, query filter and verb error paths
+
 ## [Unreleased]
 
 
