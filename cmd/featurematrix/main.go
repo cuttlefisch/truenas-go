@@ -28,12 +28,72 @@ func main() {
 	dir := flag.String("dir", ".", "project root directory")
 	output := flag.String("o", "", "output file path (default: stdout)")
 	version := flag.String("version", "", "TrueNAS version (default: latest embedded)")
+	diff := flag.Bool("diff", false, "report the method delta between two embedded schemas: -diff <from> <to>")
 	flag.Parse()
+
+	if *diff {
+		args := flag.Args()
+		if len(args) != 2 {
+			fmt.Fprintf(os.Stderr, "usage: featurematrix -diff <from-version> <to-version>\n")
+			fmt.Fprintf(os.Stderr, "  embedded versions: %s\n", strings.Join(api.Versions(), ", "))
+			os.Exit(2)
+		}
+		if err := runDiff(args[0], args[1], *output); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	if err := run(*dir, *output, *version); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// runDiff renders the delta between two embedded schemas.
+//
+// Its job is presentation only — the delta itself is computed by
+// api.DiffSchemas, so the numbers can be asserted in a unit test without going
+// through this renderer.
+func runDiff(from, to, output string) error {
+	d, err := api.DiffSchemas(from, to)
+	if err != nil {
+		return err
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "# API schema delta: %s → %s\n\n", d.From, d.To)
+	fmt.Fprintf(&b, "Added: %d | Removed: %d | Job-flag changed: %d\n",
+		len(d.Added), len(d.Removed), len(d.JobFlagChanged))
+
+	// Job-flag changes first, deliberately. Added and removed methods surface
+	// as compile or runtime errors; a method that quietly became a job returns
+	// a job ID where a caller expects a result, and nothing complains.
+	if len(d.JobFlagChanged) > 0 {
+		fmt.Fprintf(&b, "\n## Job flag changed (%d)\n\n", len(d.JobFlagChanged))
+		for _, c := range d.JobFlagChanged {
+			fmt.Fprintf(&b, "- `%s`: job %v → %v\n", c.Method, c.WasJob, c.NowJob)
+		}
+	}
+	if len(d.Removed) > 0 {
+		fmt.Fprintf(&b, "\n## Removed in %s (%d)\n\n", d.To, len(d.Removed))
+		for _, m := range d.Removed {
+			fmt.Fprintf(&b, "- `%s`\n", m)
+		}
+	}
+	if len(d.Added) > 0 {
+		fmt.Fprintf(&b, "\n## Added in %s (%d)\n\n", d.To, len(d.Added))
+		for _, m := range d.Added {
+			fmt.Fprintf(&b, "- `%s`\n", m)
+		}
+	}
+
+	if output == "" {
+		fmt.Print(b.String())
+		return nil
+	}
+	return os.WriteFile(output, []byte(b.String()), 0o644)
 }
 
 func run(dir, output, version string) error {

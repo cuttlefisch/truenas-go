@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -696,4 +697,81 @@ func TestRun_InvalidOutputPath(t *testing.T) {
 
 func writeFile(dir, name, content string) error {
 	return os.WriteFile(dir+"/"+name, []byte(content), 0644)
+}
+
+func TestRunDiff_ToFile(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "delta.md")
+	if err := runDiff("25.04", "25.10", out); err != nil {
+		t.Fatalf("runDiff: %v", err)
+	}
+
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("reading output: %v", err)
+	}
+	got := string(data)
+
+	// The summary line is what a reader checks first, and what the KB note
+	// quotes, so assert its exact shape rather than merely that it is present.
+	for _, want := range []string{
+		"# API schema delta: 25.04 → 25.10",
+		"Added: 82 | Removed: 85 | Job-flag changed: 1",
+		"## Job flag changed (1)",
+		"- `update.update`: job true → false",
+		"## Removed in 25.10 (85)",
+		"- `zfs.snapshot.create`",
+		"## Added in 25.10 (82)",
+		"- `pool.snapshot.create`",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output missing %q", want)
+		}
+	}
+
+	// Job-flag changes render before removals and additions on purpose: the
+	// other two surface as errors, a silent job-flag flip does not.
+	jobIdx := strings.Index(got, "## Job flag changed")
+	remIdx := strings.Index(got, "## Removed in")
+	addIdx := strings.Index(got, "## Added in")
+	if jobIdx >= remIdx || remIdx >= addIdx {
+		t.Errorf("section order wrong: job=%d removed=%d added=%d", jobIdx, remIdx, addIdx)
+	}
+}
+
+func TestRunDiff_ToStdout(t *testing.T) {
+	// output == "" prints instead of writing; exercise that branch too.
+	if err := runDiff("25.04", "25.10", ""); err != nil {
+		t.Fatalf("runDiff to stdout: %v", err)
+	}
+}
+
+func TestRunDiff_IdenticalVersions(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "same.md")
+	if err := runDiff("25.10", "25.10", out); err != nil {
+		t.Fatalf("runDiff: %v", err)
+	}
+	data, _ := os.ReadFile(out)
+	got := string(data)
+	if !strings.Contains(got, "Added: 0 | Removed: 0 | Job-flag changed: 0") {
+		t.Errorf("expected an all-zero summary, got:\n%s", got)
+	}
+	// With nothing to report, the detail sections must be omitted entirely
+	// rather than rendered empty.
+	for _, unwanted := range []string{"## Job flag changed", "## Removed in", "## Added in"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("expected no %q section for an empty diff", unwanted)
+		}
+	}
+}
+
+func TestRunDiff_UnknownVersion(t *testing.T) {
+	if err := runDiff("25.04", "99.99", ""); err == nil {
+		t.Error("expected an error for an unknown target version")
+	}
+}
+
+func TestRunDiff_UnwritablePath(t *testing.T) {
+	if err := runDiff("25.04", "25.10", filepath.Join(t.TempDir(), "no-such-dir", "x.md")); err == nil {
+		t.Error("expected an error writing to a nonexistent directory")
+	}
 }

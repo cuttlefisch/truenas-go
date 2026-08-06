@@ -191,3 +191,68 @@ func Namespace(method string) string {
 	}
 	return method[:i]
 }
+
+// JobFlagChange records a method whose job flag differs between two schemas.
+// It is called out separately from added/removed because it is the change most
+// likely to break a caller silently: the method still exists and still accepts
+// the same parameters, but a client that treats it as synchronous will read a
+// job ID as if it were a result.
+type JobFlagChange struct {
+	Method string
+	WasJob bool
+	NowJob bool
+}
+
+// SchemaDiff is the method-level delta between two embedded schema versions.
+type SchemaDiff struct {
+	From, To       string
+	Added          []string
+	Removed        []string
+	JobFlagChanged []JobFlagChange
+}
+
+// DiffSchemas reports what changed between two embedded schema versions.
+//
+// This lives here rather than in cmd/featurematrix because it is a fact about
+// the schemas, not about the matrix tool — which means it can be asserted in a
+// unit test with no CLI involved. That matters: the point of the diff is to
+// pin the delta with exact numbers, and a test that shelled out to a command
+// and parsed its prose would be asserting the renderer, not the data.
+//
+// Slices are sorted, so output is deterministic and diffable.
+func DiffSchemas(from, to string) (SchemaDiff, error) {
+	fromMethods, err := Methods(from)
+	if err != nil {
+		return SchemaDiff{}, err
+	}
+	toMethods, err := Methods(to)
+	if err != nil {
+		return SchemaDiff{}, err
+	}
+
+	d := SchemaDiff{From: from, To: to}
+	for name := range toMethods {
+		if _, ok := fromMethods[name]; !ok {
+			d.Added = append(d.Added, name)
+		}
+	}
+	for name, was := range fromMethods {
+		now, ok := toMethods[name]
+		if !ok {
+			d.Removed = append(d.Removed, name)
+			continue
+		}
+		if was.Job != now.Job {
+			d.JobFlagChanged = append(d.JobFlagChanged, JobFlagChange{
+				Method: name, WasJob: was.Job, NowJob: now.Job,
+			})
+		}
+	}
+
+	sort.Strings(d.Added)
+	sort.Strings(d.Removed)
+	sort.Slice(d.JobFlagChanged, func(i, j int) bool {
+		return d.JobFlagChanged[i].Method < d.JobFlagChanged[j].Method
+	})
+	return d, nil
+}
