@@ -1,0 +1,90 @@
+# git-cliff configuration for truenas-go
+# https://git-cliff.org/docs/configuration
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+"""
+body = """
+{% if version %}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}
+## [Unreleased]
+{% endif %}
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits %}
+        - {% if commit.scope %}**{{ commit.scope }}:** {% endif %}\
+            {{ commit.message | upper_first }}\
+    {% endfor %}
+{% endfor %}
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+
+# false, not true. Changed 2026-08-06.
+#
+# With it true, git-cliff rejects every non-conventional commit before any
+# parser runs and counts each as a parse error. Two things followed from that:
+# merge commits produced a permanent "N commits skipped due to parse errors"
+# warning (27 of 28 on truenas-go, 11 of 12 here), which hid any genuine parse
+# failure in the noise; and a conventional commit matching no parser was
+# dropped SILENTLY rather than surfacing.
+#
+# With it false, merge commits are skipped explicitly by the parser below, and
+# a genuinely non-conventional commit is rendered rather than vanishing.
+# Verified: the warning is gone and no merge lines leak into the output.
+filter_unconventional = false
+
+split_commits = false
+commit_parsers = [
+    # Merge commits are not conventional and never will be. This parser only
+    # takes effect because filter_unconventional is false above.
+    { message = "^Merge ", skip = true },
+
+    { message = "^feat", group = "Added" },
+    { message = "^fix", group = "Fixed" },
+    { message = "^doc", group = "Documentation" },
+    { message = "^perf", group = "Performance" },
+    { message = "^refactor", group = "Changed" },
+    { message = "^style", group = "Changed" },
+    { message = "^test", group = "Testing" },
+
+    # Present from the start here, unlike the provider's config where their
+    # absence silently dropped every `ci:` and `build:` commit. Dependabot is
+    # configured to use both prefixes, so omitting them hides its PRs too.
+    { message = "^ci", group = "Build & CI" },
+    { message = "^build", group = "Build & CI" },
+
+    { message = "^chore\\(release\\)", skip = true },
+    { message = "^chore", group = "Miscellaneous" },
+]
+protect_breaking_commits = false
+filter_commits = false
+tag_pattern = "v[0-9].*"
+topo_order = false
+sort_commits = "oldest"
+
+[bump]
+# Explicit rather than relying on git-cliff's defaults, because those defaults
+# behave differently either side of 1.0.
+#
+# This library is deliberately on 0.x while its API surface is still growing
+# -- six namespaces (sharing.smb, user, group, service, certificate, ACLs) are
+# still to land, and each is a chance to discover the shape was wrong. 0.x is
+# the honest signal that compatibility is not yet guaranteed. This setting
+# means a breaking commit bumps the MINOR while we are 0.x, rather than cutting
+# 1.0.0 by accident: a one-way door should not be opened by a commit message.
+#
+# Flip this to true as part of deliberately cutting 1.0.0, not before.
+breaking_always_bump_major = false
+features_always_bump_minor = true
