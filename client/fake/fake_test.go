@@ -266,3 +266,183 @@ func TestFake_SeedBypassesNormalization(t *testing.T) {
 		t.Error("Seed returned no id")
 	}
 }
+
+// The remaining surface: accessors, option plumbing, the query filter, and the
+// error paths of each verb. These were the gap that pushed the package below
+// the repo's coverage bar — worth closing on merit anyway, since the filter and
+// the error paths are exactly where a fake quietly returning the wrong thing
+// would send someone hunting a phantom bug in the code under test.
+
+func TestServer_AccessorsAndOptions(t *testing.T) {
+	s := New(WithVersion("TrueNAS-25.04.1"))
+	defer s.Close()
+
+	if s.URL() == "" {
+		t.Error("URL is empty")
+	}
+	if !strings.HasPrefix(s.URL(), "https://") {
+		t.Errorf("URL = %q, want an https:// base (the fake serves TLS)", s.URL())
+	}
+	if s.Host() == "" || strings.Contains(s.Host(), "/") {
+		t.Errorf("Host = %q, want a bare host:port", s.Host())
+	}
+	host, port := s.HostPort()
+	if host == "" || port == 0 {
+		t.Errorf("HostPort = %q, %d", host, port)
+	}
+
+	// WithVersion must actually reach system.version.
+	c := dial(t, s)
+	raw, err := c.Call(context.Background(), "system.version", nil)
+	if err != nil {
+		t.Fatalf("system.version: %v", err)
+	}
+	var got string
+	_ = json.Unmarshal(raw, &got)
+	if got != "TrueNAS-25.04.1" {
+		t.Errorf("system.version = %q, want the value passed to WithVersion", got)
+	}
+}
+
+func TestQuery_IDFilter(t *testing.T) {
+	s := New()
+	defer s.Close()
+	a := s.Seed("user", map[string]any{"username": "alice"})
+	_ = s.Seed("user", map[string]any{"username": "bob"})
+
+	c := dial(t, s)
+	ctx := context.Background()
+
+	// Filtered: exactly the requested record.
+	raw, err := c.Call(ctx, "user.query", []any{[]any{[]any{"id", "=", a}}})
+	if err != nil {
+		t.Fatalf("filtered query: %v", err)
+	}
+	var got []map[string]any
+	_ = json.Unmarshal(raw, &got)
+	if len(got) != 1 || got[0]["username"] != "alice" {
+		t.Errorf("filtered query returned %v, want just alice", got)
+	}
+
+	// An unrecognised filter returns everything rather than nothing. Returning
+	// an empty set would look identical to "the record does not exist" and
+	// send someone debugging the wrong layer.
+	raw, err = c.Call(ctx, "user.query", []any{[]any{[]any{"username", "=", "alice"}}})
+	if err != nil {
+		t.Fatalf("unsupported-filter query: %v", err)
+	}
+	_ = json.Unmarshal(raw, &got)
+	if len(got) != 2 {
+		t.Errorf("unsupported filter returned %d records, want all 2", len(got))
+	}
+}
+
+func TestQuery_IsSortedByID(t *testing.T) {
+	s := New()
+	defer s.Close()
+	for _, n := range []string{"a", "b", "c", "d"} {
+		s.Seed("user", map[string]any{"username": n})
+	}
+	c := dial(t, s)
+	raw, err := c.Call(context.Background(), "user.query", []any{})
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	var got []map[string]any
+	_ = json.Unmarshal(raw, &got)
+	for i := 1; i < len(got); i++ {
+		if toInt64(got[i-1]["id"]) >= toInt64(got[i]["id"]) {
+			t.Fatalf("query results not sorted by id: %v", got)
+		}
+	}
+}
+
+func TestVerbs_ErrorPaths(t *testing.T) {
+	s := New()
+	defer s.Close()
+	c := dial(t, s)
+	ctx := context.Background()
+
+	tests := []struct {
+		name   string
+		method string
+		params any
+	}{
+		{"get_instance on a missing record", "user.get_instance", []any{9999}},
+		{"update on a missing record", "user.update", []any{9999, map[string]any{"x": 1}}},
+		{"delete on a missing record", "user.delete", []any{9999}},
+		{"update with no payload", "user.update", []any{1}},
+		{"create with a non-object payload", "user.create", []any{"not-an-object"}},
+		{"get_instance with a non-numeric id", "user.get_instance", []any{"abc"}},
+		{"delete with a non-numeric id", "user.delete", []any{"abc"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := c.Call(ctx, tt.method, tt.params); err == nil {
+				t.Errorf("%s: expected an error", tt.method)
+			}
+		})
+	}
+}
+
+// Ids are server-owned: a client must not be able to move a record by patching
+// its id, which would silently corrupt the store.
+func TestUpdate_CannotReassignID(t *testing.T) {
+	s := New()
+	defer s.Close()
+	id := s.Seed("user", map[string]any{"username": "alice"})
+	c := dial(t, s)
+
+	if _, err := c.Call(context.Background(), "user.update",
+		[]any{id, map[string]any{"id": 4242, "username": "alice2"}}); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	recs := s.Records("user")
+	if len(recs) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(recs))
+	}
+	if toInt64(recs[0]["id"]) != id {
+		t.Errorf("id was reassigned to %v", recs[0]["id"])
+	}
+	if recs[0]["username"] != "alice2" {
+		t.Errorf("the rest of the patch did not apply: %v", recs[0])
+	}
+}
+
+func TestToInt64(t *testing.T) {
+	cases := map[string]struct {
+		in   any
+		want int64
+	}{
+		"int64":         {int64(7), 7},
+		"int":           {9, 9},
+		"float64":       {float64(11), 11}, // how JSON numbers decode into any
+		"string":        {"13", 0},         // unconvertible → 0, not a panic
+		"nil":           {nil, 0},
+		"bool":          {true, 0},
+		"float w/ frac": {float64(3.9), 3},
+	}
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := toInt64(tt.in); got != tt.want {
+				t.Errorf("toInt64(%v) = %d, want %d", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSplitMethod(t *testing.T) {
+	cases := []struct{ in, ns, verb string }{
+		{"sharing.nfs.create", "sharing.nfs", "create"},
+		{"user.query", "user", "query"},
+		{"pool.dataset.get_instance", "pool.dataset", "get_instance"},
+		{"bare", "", "bare"},
+	}
+	for _, tt := range cases {
+		ns, verb := splitMethod(tt.in)
+		if ns != tt.ns || verb != tt.verb {
+			t.Errorf("splitMethod(%q) = (%q, %q), want (%q, %q)", tt.in, ns, verb, tt.ns, tt.verb)
+		}
+	}
+}
