@@ -2,6 +2,7 @@ package truenas
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -43,5 +44,67 @@ func TestMockFilesystemService_CallsFunc(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("expected StatFunc to be called")
+	}
+}
+
+func TestMockFilesystemService_ACLDefaultsToNil(t *testing.T) {
+	m := &MockFilesystemService{}
+
+	acl, err := m.GetACL(context.Background(), GetACLOpts{Path: "/mnt/x"})
+	if acl != nil || err != nil {
+		t.Errorf("GetACL = %v, %v; want nil, nil", acl, err)
+	}
+	if err := m.SetACL(context.Background(), SetACLOpts{Path: "/mnt/x"}); err != nil {
+		t.Errorf("SetACL = %v; want nil", err)
+	}
+}
+
+func TestMockFilesystemService_ACLCallsFunc(t *testing.T) {
+	var gotGet GetACLOpts
+	var gotSet SetACLOpts
+	m := &MockFilesystemService{
+		GetACLFunc: func(_ context.Context, opts GetACLOpts) (*ACL, error) {
+			gotGet = opts
+			return &ACL{Path: opts.Path, ACLType: ACLTypeNFS4}, nil
+		},
+		SetACLFunc: func(_ context.Context, opts SetACLOpts) error {
+			gotSet = opts
+			return nil
+		},
+	}
+
+	acl, err := m.GetACL(context.Background(), GetACLOpts{Path: "/mnt/x", ResolveIDs: true})
+	if err != nil {
+		t.Fatalf("GetACL: %v", err)
+	}
+	if acl.ACLType != ACLTypeNFS4 || !gotGet.ResolveIDs {
+		t.Errorf("GetACL passthrough failed: %+v / %+v", acl, gotGet)
+	}
+
+	if err := m.SetACL(context.Background(), SetACLOpts{Path: "/mnt/y", StripACL: true}); err != nil {
+		t.Fatalf("SetACL: %v", err)
+	}
+	if gotSet.Path != "/mnt/y" || !gotSet.StripACL {
+		t.Errorf("SetACL passthrough failed: %+v", gotSet)
+	}
+}
+
+func TestMockFilesystemService_PreflightSetPerm(t *testing.T) {
+	m := &MockFilesystemService{}
+	if err := m.PreflightSetPerm(context.Background(), SetPermOpts{Path: "/mnt/x"}); err != nil {
+		t.Errorf("PreflightSetPerm = %v; want nil by default", err)
+	}
+
+	var got SetPermOpts
+	m.PreflightSetPermFunc = func(_ context.Context, opts SetPermOpts) error {
+		got = opts
+		return ErrExtendedACLPresent
+	}
+	err := m.PreflightSetPerm(context.Background(), SetPermOpts{Path: "/mnt/y", Mode: "755"})
+	if !errors.Is(err, ErrExtendedACLPresent) {
+		t.Errorf("PreflightSetPerm = %v", err)
+	}
+	if got.Path != "/mnt/y" || got.Mode != "755" {
+		t.Errorf("passthrough failed: %+v", got)
 	}
 }

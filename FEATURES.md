@@ -2,7 +2,7 @@
 
 TrueNAS version: 25.10
 
-Total API methods: 768 | Implemented: 79 (10.3%) | Tested: 75 (94.9% of implemented)
+Total API methods: 768 | Implemented: 81 (10.5%) | Tested: 77 (95.1% of implemented)
 
 ## Covered Namespaces
 
@@ -13,7 +13,7 @@ Total API methods: 768 | Implemented: 79 (10.3%) | Tested: 75 (94.9% of implemen
 | CronService | cronjob | 6 | 6 (100%) | 6 (100%) |
 | DatasetService | pool, pool.dataset | 51 | 5 (10%) | 5 (100%) |
 | DockerService | docker | 9 | 2 (22%) | 2 (100%) |
-| FilesystemService | filesystem | 12 | 2 (17%) | 2 (100%) |
+| FilesystemService | filesystem | 12 | 4 (33%) | 4 (100%) |
 | InterfaceService | interface | 23 | 1 (4%) | 1 (100%) |
 | NetworkService | network.general | 1 | 1 (100%) | 1 (100%) |
 | ReportingService | reporting | 8 | 2 (25%) | 2 (100%) |
@@ -199,12 +199,12 @@ Total API methods: 768 | Implemented: 79 (10.3%) | Tested: 75 (94.9% of implemen
 | filesystem.chown |  |  |  |  |
 | filesystem.get |  |  |  |  |
 | filesystem.get_zfs_attributes |  |  |  |  |
-| filesystem.getacl |  |  |  |  |
+| filesystem.getacl | ✓ | GetACL | ✓ | 6 |
 | filesystem.listdir |  |  |  |  |
 | filesystem.mkdir |  |  |  |  |
 | filesystem.put |  |  |  |  |
 | filesystem.set_zfs_attributes |  |  |  |  |
-| filesystem.setacl |  |  |  |  |
+| filesystem.setacl | ✓ | SetACL | ✓ | 10 |
 | filesystem.setperm | ✓ | SetPermissions | ✓ | 4 |
 | filesystem.stat | ✓ | Stat | ✓ | 4 |
 | filesystem.statfs |  |  |  |  |
